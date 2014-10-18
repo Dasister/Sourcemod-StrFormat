@@ -137,7 +137,7 @@ reswitch:
             CHECK_ARGS(arg_to_use);
             cell_t *value;
             pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use)], &value);
-            // AddBinary(&buf_p, llen, *value, width, flags);
+            AddBinary(&buf_p, llen, *value, width, flags);
             arg_to_use++;
             break;
         }
