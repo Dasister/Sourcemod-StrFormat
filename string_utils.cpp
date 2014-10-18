@@ -20,6 +20,7 @@
 
 void AddInt(char **buf_p, size_t &maxlen, int val, int width, int flags);
 void AddUInt(char **buf_p, size_t &maxlen, unsigned int val, int width, int flags);
+void AddBinary(char **buf_p, size_t &maxlen, unsigned int val, int width, int flags);
 
 size_t strformat(char *buffer, size_t maxlen, const char *format, IPluginContext *pContext, const cell_t *params, int *param)
 {
