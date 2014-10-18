@@ -4,24 +4,27 @@
 
 #include <cmath>
 
-#define LADJUST			0x00000004		/* left adjustment */
-#define ZEROPAD			0x00000080		/* zero (as opposed to blank) pad */
-#define UPPERDIGITS		0x00000200		/* make alpha digits uppercase */
-#define to_digit(c)		((c) - '0')
-#define is_digit(c)		((unsigned)to_digit(c) <= 9)
+#define LADJUST         0x00000004      /* left adjustment */
+#define ZEROPAD         0x00000080      /* zero (as opposed to blank) pad */
+#define UPPERDIGITS     0x00000200      /* make alpha digits uppercase */
+#define to_digit(c)     ((c) - '0')
+#define is_digit(c)     ((unsigned)to_digit(c) <= 9)
 
 #define CHECK_ARGS(x) \
-	if ((arg+x) > args) { \
-		pContext->ThrowNativeErrorEx(SP_ERROR_PARAM, "String formatted incorrectly - parameter %d (total %d)", arg, args); \
-		return 0; \
-			}
+    if ((arg+x) > args) { \
+        pContext->ThrowNativeErrorEx(SP_ERROR_PARAM, "String formatted incorrectly - parameter %d (total %d)", arg, args); \
+        return 0; \
+    }
 
-#define CALC_ARG(x)    (arg + x)
+#define CALC_ARG(x)     (arg + x)
 
 void AddInt(char **buf_p, size_t &maxlen, int val, int width, int flags);
+void AddUInt(char **buf_p, size_t &maxlen, unsigned int val, int width, int flags);
 
-size_t strformat(char *buffer, size_t maxlen, const char *format, IPluginContext *pContext, const cell_t *params, int *param) {
-    if (!buffer || !maxlen) {
+size_t strformat(char *buffer, size_t maxlen, const char *format, IPluginContext *pContext, const cell_t *params, int *param)
+{
+    if (!buffer || !maxlen)
+    {
         return 0;
     }
 
@@ -43,12 +46,15 @@ size_t strformat(char *buffer, size_t maxlen, const char *format, IPluginContext
     arg = *param;
     arg_to_use = 0;
 
-    while (true) {
-        for (ch = *fmt; llen && ((ch = *fmt) != '\0') && (ch != '%'); fmt++) {
+    while (true)
+    {
+        for (ch = *fmt; llen && ((ch = *fmt) != '\0') && (ch != '%'); fmt++)
+        {
             *buf_p++ = ch;
             llen--;
         }
-        if ((ch == '\0') || (llen <= 0)) {
+        if ((ch == '\0') || (llen <= 0))
+        {
             goto done;
         }
 
@@ -63,26 +69,32 @@ rflag:
         ch = *fmt++;
 
 reswitch:
-        switch (ch) {
-        case '-': {
+        switch (ch)
+        {
+        case '-':
+        {
             flags |= LADJUST;
             goto rflag;
         }
-        case '$': {
+        case '$':
+        {
             arg_to_use = width - 1;
             width = 0;
             ch = *fmt++;
             goto reswitch;
         }
-        case '.': {
+        case '.':
+        {
             n = 0;
-            while (is_digit((ch = *fmt++))) {
+            while (is_digit((ch = *fmt++)))
+            {
                 n = 10 * n + (ch - '0');
             }
             prec = (n < 0) ? -1 : n;
             goto reswitch;
         }
-        case '0': {
+        case '0':
+        {
             flags |= ZEROPAD;
             goto rflag;
         }
@@ -94,18 +106,23 @@ reswitch:
         case '6':
         case '7':
         case '8':
-        case '9': {
+        case '9':
+        {
             n = 0;
-            do {
+            do
+            {
                 n = 10 * n + (ch - '0');
                 ch = *fmt++;
-            } while (is_digit(ch));
+            }
+            while (is_digit(ch));
             width = n;
             goto reswitch;
         }
-        case 'c': {
+        case 'c':
+        {
             CHECK_ARGS(arg_to_use);
-            if (!llen) {
+            if (!llen)
+            {
                 goto done;
             }
             char *c;
@@ -115,7 +132,8 @@ reswitch:
             arg_to_use++;
             break;
         }
-        case 'b': {
+        case 'b':
+        {
             CHECK_ARGS(arg_to_use);
             cell_t *value;
             pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use)], &value);
@@ -125,7 +143,8 @@ reswitch:
         }
 
         case 'i':
-        case 'd': {
+        case 'd':
+        {
             CHECK_ARGS(arg_to_use);
             cell_t *value;
             pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use)], &value);
@@ -133,15 +152,17 @@ reswitch:
             arg_to_use++;
             break;
         }
-        case 'u': {
+        case 'u':
+        {
             CHECK_ARGS(arg_to_use);
             cell_t *value;
             pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use)], &value);
-            // AddUInt(&buf_p, llen, static_cast<unsigned int>(*value), width, flags);
+            AddUInt(&buf_p, llen, static_cast<unsigned int>(*value), width, flags);
             arg_to_use++;
             break;
         }
-        case 'f': {
+        case 'f':
+        {
             CHECK_ARGS(arg_to_use);
             cell_t *value;
             pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use)], &value);
@@ -158,7 +179,8 @@ done:
     return (maxlen - llen - 1);
 }
 
-void AddInt(char **buf_p, size_t &maxlen, int val, int width, int flags) {
+void AddInt(char **buf_p, size_t &maxlen, int val, int width, int flags)
+{
     char text[32];
     int digits;
     int signedVal;
@@ -167,36 +189,140 @@ void AddInt(char **buf_p, size_t &maxlen, int val, int width, int flags) {
 
     digits = 0;
     signedVal = 0;
-    if (val < 0) {
+    if (val < 0)
+    {
         unsignedVal = std::abs(val);
-    } else {
+    }
+    else
+    {
         unsignedVal = val;
     }
-    do {
+    do
+    {
         text[digits++] = '0' + unsignedVal % 10;
         unsignedVal /= 10;
-    } while (unsignedVal);
-    if (signedVal < 0) {
+    }
+    while (unsignedVal);
+    if (signedVal < 0)
+    {
         text[digits++] = '-';
     }
 
     buf = *buf_p;
 
-    if (!(flags & LADJUST)) {
-        while ((digits < width) && maxlen) {
+    if (!(flags & LADJUST))
+    {
+        while ((digits < width) && maxlen)
+        {
             *buf++ = (flags & ZEROPAD ? '0' : ' ');
             width--;
             maxlen--;
         }
     }
-    while (digits-- && maxlen) {
+    while (digits-- && maxlen)
+    {
         *buf++ = text[digits];
     }
-    if (flags & LADJUST) {
-        while (width-- && maxlen) {
-            *buf++ = (flags & ZEROPAD ? '0': ' ');
+    if (flags & LADJUST)
+    {
+        while (width-- && maxlen)
+        {
+            *buf++ = (flags & ZEROPAD ? '0' : ' ');
             maxlen--;
         }
     }
+    *buf_p = buf;
+}
+
+void AddUInt(char **buf_p, size_t &maxlen, unsigned int val, int width, int flags)
+{
+    char text[32];
+    int digits;
+    char *buf;
+
+    digits = 0;
+    do
+    {
+        text[digits++] = '0' + val % 10;
+        val /= 10;
+    }
+    while (val);
+    buf = *buf_p;
+
+    if (!(flags & LADJUST))
+    {
+        while (digits <= width && maxlen)
+        {
+            *buf++ = (flags & ZEROPAD ? '0' : ' ');
+            width--;
+            maxlen--;
+        }
+    }
+    while (digits-- && maxlen)
+    {
+        *buf++ = (flags & ZEROPAD ? '0' : ' ');
+        width--;
+        maxlen--;
+    }
+    if (flags & LADJUST)
+    {
+        while (digits-- && maxlen)
+        {
+            *buf++ = (flags & ZEROPAD ? '0' : ' ');
+            maxlen--;
+        }
+    }
+    *buf_p = buf;
+}
+
+void AddBinary(char **buf_p, size_t &maxlen, unsigned int val, int width, int flags)
+{
+    char text[32];
+    int digits;
+    char *buf;
+
+    digits = 0;
+    do
+    {
+        if (val & 1)
+        {
+            text[digits++] = '1';
+        }
+        else
+        {
+            text[digits++] = '0';
+        }
+        val >>= 1;
+    }
+    while (val);
+
+    buf = *buf_p;
+
+    if (!(flags & LADJUST))
+    {
+        while (digits < width && maxlen)
+        {
+            *buf++ = (flags & ZEROPAD) ? '0' : ' ';
+            width--;
+            maxlen--;
+        }
+    }
+
+    while (digits-- && maxlen)
+    {
+        *buf++ = text[digits];
+        width--;
+        maxlen--;
+    }
+
+    if (flags & LADJUST)
+    {
+        while (width-- && maxlen)
+        {
+            *buf++ = (flags & ZEROPAD) ? '0' : ' ';
+            maxlen--;
+        }
+    }
+
     *buf_p = buf;
 }
