@@ -5,7 +5,7 @@
 ### EDIT THESE PATHS FOR YOUR OWN SETUP ###
 ###########################################
 
-SMSDK = ../..
+SMSDK = ../../Work/sourcemod/sourcemod
 HL2SDK_ORIG = ../../../hl2sdk
 HL2SDK_OB = ../../../hl2sdk-ob
 HL2SDK_CSS = ../../../hl2sdk-css
@@ -13,7 +13,7 @@ HL2SDK_OB_VALVE = ../../../hl2sdk-ob-valve
 HL2SDK_L4D = ../../../hl2sdk-l4d
 HL2SDK_L4D2 = ../../../hl2sdk-l4d2
 HL2SDK_CSGO = ../../../hl2sdk-csgo
-MMSOURCE19 = ../../../mmsource-1.9
+MMSOURCE19 = ../..//Work/sourcemod/mmsource
 
 #####################################
 ### EDIT BELOW FOR OTHER PROJECTS ###
@@ -24,7 +24,7 @@ PROJECT = sample
 #Uncomment for Metamod: Source enabled extension
 #USEMETA = true
 
-OBJECTS = sdk/smsdk_ext.cpp extension.cpp
+OBJECTS = sdk/smsdk_ext.cpp extension.cpp natives.cpp string_utils.cpp
 
 ##############################################
 ### CONFIGURE ANY OTHER FLAGS/OPTIONS HERE ###
