@@ -26,6 +26,8 @@ void AddBinary(char **buf_p, size_t &maxlen, unsigned int val, int width, int fl
 void AddFloat(char **buf_p, size_t &maxlen, double fval, int width, int prec, int flags);
 void AddString(char **buf_p, size_t &maxlen, const char *string, int width, int prec);
 void AddHex(char **buf_p, size_t &maxlen, unsigned int val, int width, int flags);
+size_t Translate(char *buffer, size_t maxlen, IPluginContext *pCtx, const char *key,
+	cell_t target, const cell_t *params, int base_arg, int *arg, bool *error);
 
 size_t UTIL_Format(char *buffer, size_t maxlength, const char *fmt, ...)
 {
@@ -267,11 +269,85 @@ reswitch:
 		}
 		case 'T':
 		{
-
+			CHECK_ARGS(arg_to_use + 1);
+			char *key;
+			bool error;
+			size_t res;
+			cell_t *target;
+			pContext->LocalToString(params[CALC_ARG(arg_to_use++)], &key);
+			pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use++)], &target);
+			res = Translate(buf_p, llen, pContext, key, *target, params, arg, &arg_to_use, &error);
+			if (error)
+			{
+				return 0;
+			}
+			buf_p += res;
+			llen -= res;
 		}
 		case 't':
 		{
-
+			CHECK_ARGS(arg_to_use);
+			char *key;
+			bool error;
+			size_t res;
+			cell_t target = smutils->GetGlobalTarget();
+			pContext->LocalToString(params[CALC_ARG(arg_to_use++)], &key);
+			res = Translate(buf_p, llen, pContext, key, target, params, arg, &arg_to_use, &error);
+			if (error)
+			{
+				return 0;
+			}
+			buf_p += res;
+			llen -= res;
+		}
+		case 'X':
+		{
+			CHECK_ARGS(arg_to_use);
+			cell_t *value;
+			pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use)], &value);
+			flags |= UPPERDIGITS;
+			AddHex(&buf_p, llen, static_cast<unsigned int>(*value), width, flags);
+			arg_to_use++;
+			break;
+		}
+		case 'x':
+		{
+			CHECK_ARGS(arg_to_use);
+			cell_t *value;
+			pContext->LocalToPhysAddr(params[CALC_ARG(arg_to_use)], &value);
+			AddHex(&buf_p, llen, static_cast<unsigned int>(*value), width, flags);
+			arg_to_use++;
+			break;
+		}
+		case '%':
+		{
+			if (!llen)
+			{
+				goto done;
+			}
+			*buf_p++ = ch;
+			llen--;
+			break;
+		}
+		case '\0':
+		{
+			if (!llen)
+			{
+				goto done;
+			}
+			*buf_p++ = '%';
+			llen--;
+			goto done;
+		}
+		default:
+		{
+			if (!llen)
+			{
+				goto done;
+			}
+			*buf_p++ = ch;
+			llen--;
+			break;
 		}
         }
     }
@@ -670,14 +746,104 @@ void AddHex(char **buf_p, size_t &maxlen, unsigned int val, int width, int flags
 	*buf_p = buf;
 }
 
+inline void ReorderTranslationParams(const Translation *pTrans, cell_t *params)
+{
+	cell_t new_params[MAX_TRANSLATE_PARAMS];
+	for (unsigned int i = 0; i < pTrans->fmt_count; i++)
+	{
+		new_params[i] = params[pTrans->fmt_order[i]];
+	}
+	memcpy(params, new_params, pTrans->fmt_count * sizeof(cell_t));
+}
+
 size_t Translate(char *buffer,
 	size_t maxlen,
 	IPluginContext *pCtx,
 	const char *key,
 	cell_t target,
 	const cell_t *params,
+	int base_arg,
 	int *arg,
 	bool *error)
 {
-#error Implement me.
+#define T_CALC_ARG(x)	(base_arg + x)
+
+	unsigned int langid;
+	*error = false;
+	Translation pTrans;
+	IPlugin *pl = plsys->FindPluginByContext(pCtx->GetContext());
+	unsigned int max_params = 0;
+	IPhraseCollection *pPhrases;
+
+	pPhrases = pl->GetPhrases();
+
+try_serverlang:
+	if (target == SOURCEMOD_SERVER_LANGUAGE)
+	{
+		langid = translator->GetServerLanguage();
+	}
+	else if ((target >= 1) && (target <= playerhelpers->GetMaxClients()))
+	{
+		langid = translator->GetClientLanguage(target);
+	}
+	else
+	{
+		pCtx->ThrowNativeErrorEx(SP_ERROR_PARAM, "Translation failed: invalid client index %d", target);
+		goto error_out;
+	}
+
+	if (pPhrases->FindTranslation(key, langid, &pTrans) != Trans_Okay)
+	{
+		if (target != SOURCEMOD_SERVER_LANGUAGE && langid != translator->GetServerLanguage())
+		{
+			target = SOURCEMOD_SERVER_LANGUAGE;
+			goto try_serverlang;
+		}
+		else if (langid != SOURCEMOD_LANGUAGE_ENGLISH)
+		{
+			if (pPhrases->FindTranslation(key, SOURCEMOD_LANGUAGE_ENGLISH, &pTrans) != Trans_Okay)
+			{
+				pCtx->ThrowNativeErrorEx(SP_ERROR_PARAM, "Language phrase \"%s\" not found", key);
+				goto error_out;
+			}
+		}
+		else
+		{
+			pCtx->ThrowNativeErrorEx(SP_ERROR_PARAM, "Language phrase \"%s\" not found", key);
+			goto error_out;
+		}
+	}
+
+	max_params = pTrans.fmt_count;
+
+	if (max_params)
+	{
+		cell_t new_params[MAX_TRANSLATE_PARAMS];
+
+		/* Check if we're going to over the limit */
+		if ((T_CALC_ARG(*arg)) + (max_params - 1) > (size_t)params[0])
+		{
+			pCtx->ThrowNativeErrorEx(SP_ERROR_PARAMS_MAX,
+				"Translation string formatted incorrectly - missing at least %d parameters",
+				((T_CALC_ARG(*arg) + (max_params - 1)) - params[0])
+				);
+			goto error_out;
+		}
+
+		/* If we need to re-order the parameters, do so with a temporary array.
+		* Otherwise, we could run into trouble with continual formats, a la ShowActivity().
+		*/
+		memcpy(new_params, params, sizeof(cell_t) * (params[0] + 1));
+		ReorderTranslationParams(&pTrans, &new_params[T_CALC_ARG(*arg)]);
+
+		return strformat(buffer, maxlen, pTrans.szPhrase, pCtx, new_params, arg);
+	}
+	else
+	{
+		return strformat(buffer, maxlen, pTrans.szPhrase, pCtx, params, arg);
+	}
+
+error_out:
+	*error = true;
+	return 0;
 }
